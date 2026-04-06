@@ -317,6 +317,10 @@ class _BodyScanScreenState extends State<BodyScanScreen>
                   _chip('${e['weight_kg']}kg', Icons.monitor_weight_outlined),
                 if (e['waist_cm'] != null)
                   _chip('${e['waist_cm']}cm waist', Icons.straighten),
+                if (e['neck_cm'] != null)
+                  _chip('${e['neck_cm']}cm neck', Icons.straighten),
+                if (e['hips_cm'] != null)
+                  _chip('${e['hips_cm']}cm hips', Icons.straighten),
                 if (e['chest_cm'] != null)
                   _chip('${e['chest_cm']}cm chest', Icons.straighten),
               ]),
@@ -522,6 +526,8 @@ class _NewEntryViewState extends State<_NewEntryView> {
   final Map<String, bool> _fieldImperial = {
     'weight': false,
     'waist': false,
+    'neck': false,
+    'hips': false,
     'chest': false,
     'arms': false,
     'thighs': false,
@@ -529,6 +535,8 @@ class _NewEntryViewState extends State<_NewEntryView> {
 
   final _weightCtrl = TextEditingController();
   final _waistCtrl = TextEditingController();
+  final _neckCtrl = TextEditingController();
+  final _hipsCtrl = TextEditingController();
   final _chestCtrl = TextEditingController();
   final _armsCtrl = TextEditingController();
   final _thighsCtrl = TextEditingController();
@@ -548,6 +556,8 @@ class _NewEntryViewState extends State<_NewEntryView> {
   void dispose() {
     _weightCtrl.dispose();
     _waistCtrl.dispose();
+    _neckCtrl.dispose();
+    _hipsCtrl.dispose();
     _chestCtrl.dispose();
     _armsCtrl.dispose();
     _thighsCtrl.dispose();
@@ -593,6 +603,10 @@ class _NewEntryViewState extends State<_NewEntryView> {
       if (wkg != null) request.fields['weight_kg'] = wkg.toStringAsFixed(2);
       final waist = _toCm(_waistCtrl.text, 'waist');
       if (waist != null) request.fields['waist_cm'] = waist.toStringAsFixed(1);
+      final neck = _toCm(_neckCtrl.text, 'neck');
+      if (neck != null) request.fields['neck_cm'] = neck.toStringAsFixed(1);
+      final hips = _toCm(_hipsCtrl.text, 'hips');
+      if (hips != null) request.fields['hips_cm'] = hips.toStringAsFixed(1);
       final chest = _toCm(_chestCtrl.text, 'chest');
       if (chest != null) request.fields['chest_cm'] = chest.toStringAsFixed(1);
       final arms = _toCm(_armsCtrl.text, 'arms');
@@ -749,6 +763,10 @@ class _NewEntryViewState extends State<_NewEntryView> {
       _tfWithUnit(_weightCtrl, 'e.g. 75', 'e.g. 165', 'weight', 'kg', 'lbs'),
       _label('WAIST'),
       _tfWithUnit(_waistCtrl, 'e.g. 82', 'e.g. 32', 'waist', 'cm', 'in'),
+      _label('NECK'),
+      _tfWithUnit(_neckCtrl, 'e.g. 38', 'e.g. 15', 'neck', 'cm', 'in'),
+      _label('HIPS (Req. for female BF%)'),
+      _tfWithUnit(_hipsCtrl, 'e.g. 95', 'e.g. 38', 'hips', 'cm', 'in'),
       _label('CHEST'),
       _tfWithUnit(_chestCtrl, 'e.g. 100', 'e.g. 40', 'chest', 'cm', 'in'),
       _label('ARMS'),

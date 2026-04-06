@@ -27,7 +27,7 @@ class _AssessmentWizardScreenState extends State<AssessmentWizardScreen> {
 
   // Step 0: Class
   String _playerClass = 'Vanguard';
-  static const _playerClasses = ['Vanguard', 'Assassin', 'Ranger', 'Mage'];
+  static const _playerClasses = ['Vanguard', 'Assassin', 'Ranger'];
 
   // Step 1: Body Measurements
   final _waistCtrl = TextEditingController();
@@ -292,6 +292,18 @@ class _AssessmentWizardScreenState extends State<AssessmentWizardScreen> {
 
   // ── Step 0: Player Class ───────────────────────────────────────────────────
   Widget _buildStepClass() {
+    final Map<String, String> descriptions = {
+      'Vanguard': 'The Powerhouse. Focuses on heavy lifting, raw strength, and muscle hypertrophy.',
+      'Assassin': 'The Speedster. Focuses on agility, HIIT, and high-intensity bodyweight training.',
+      'Ranger': 'The Marathoner. Focuses on endurance, stamina, and steady-state cardio.',
+    };
+
+    final Map<String, IconData> icons = {
+      'Vanguard': Icons.fitness_center,
+      'Assassin': Icons.directions_run,
+      'Ranger': Icons.directions_walk,
+    };
+
     return _stepContainer([
       Container(
         padding: const EdgeInsets.all(16),
@@ -300,10 +312,10 @@ class _AssessmentWizardScreenState extends State<AssessmentWizardScreen> {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: FQColors.gold.withOpacity(0.2)),
         ),
-        child: Row(children: [
-          const Icon(Icons.shield, color: FQColors.gold, size: 18),
-          const SizedBox(width: 10),
-          const Expanded(
+        child: const Row(children: [
+          Icon(Icons.shield, color: FQColors.gold, size: 18),
+          SizedBox(width: 10),
+          Expanded(
             child: Text(
               'Choose your starting class. This represents your primary fitness focus.',
               style: TextStyle(color: FQColors.muted, fontSize: 12),
@@ -311,35 +323,63 @@ class _AssessmentWizardScreenState extends State<AssessmentWizardScreen> {
           ),
         ]),
       ),
-      const SizedBox(height: 20),
+      const SizedBox(height: 24),
       ..._playerClasses.map((c) {
         final isSelected = _playerClass == c;
-        return GestureDetector(
-          onTap: () => setState(() => _playerClass = c),
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: isSelected ? FQColors.cyan.withOpacity(0.1) : FQColors.surface,
-              border: Border.all(color: isSelected ? FQColors.cyan : FQColors.border),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  c == 'Vanguard' ? Icons.fitness_center :
-                  c == 'Assassin' ? Icons.directions_run :
-                  c == 'Ranger'   ? Icons.directions_walk :
-                                    Icons.auto_fix_high,
-                  color: isSelected ? FQColors.cyan : FQColors.muted,
+        final desc = descriptions[c] ?? '';
+        final icon = icons[c] ?? Icons.help_outline;
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: InkWell(
+            onTap: () => setState(() => _playerClass = c),
+            borderRadius: BorderRadius.circular(16),
+            child: Card(
+              margin: EdgeInsets.zero,
+              color: isSelected ? FQColors.cyan.withOpacity(0.05) : FQColors.surface,
+              elevation: isSelected ? 4 : 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(
+                  color: isSelected ? FQColors.cyan : FQColors.border,
+                  width: isSelected ? 2 : 1,
                 ),
-                const SizedBox(width: 16),
-                Text(c, style: TextStyle(
-                  color: isSelected ? Colors.white : FQColors.muted,
-                  fontSize: 16,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                )),
-              ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+                child: ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: isSelected ? FQColors.cyan.withOpacity(0.1) : FQColors.bg,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      icon,
+                      color: isSelected ? FQColors.cyan : FQColors.muted,
+                    ),
+                  ),
+                  title: Text(
+                    c.toUpperCase(),
+                    style: GoogleFonts.rajdhani(
+                      color: isSelected ? Colors.white : FQColors.muted,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                  subtitle: Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      desc,
+                      style: const TextStyle(color: FQColors.muted, fontSize: 13, height: 1.3),
+                    ),
+                  ),
+                  trailing: isSelected 
+                    ? const Icon(Icons.check_circle, color: FQColors.cyan)
+                    : null,
+                ),
+              ),
             ),
           ),
         );

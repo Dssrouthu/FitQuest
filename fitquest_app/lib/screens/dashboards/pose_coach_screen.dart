@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:async';
 import 'dart:math';
 import 'dart:ui';
@@ -111,6 +112,7 @@ class _PoseCoachScreenState extends State<PoseCoachScreen> {
   bool _detecting = false;
   String _hint = 'TAP START to begin';
   _Exercise? _selectedExercise;
+  CameraLensDirection _cameraDirection = CameraLensDirection.front;
 
   // Performance & Smoothing
   int _frameCount = 0;
@@ -144,7 +146,7 @@ class _PoseCoachScreenState extends State<PoseCoachScreen> {
       final cameras = await availableCameras();
       if (cameras.isEmpty) return;
       final camera = cameras.firstWhere(
-        (c) => c.lensDirection == CameraLensDirection.back,
+        (c) => c.lensDirection == _cameraDirection,
         orElse: () => cameras.first,
       );
       _cameraController = CameraController(
@@ -199,7 +201,6 @@ class _PoseCoachScreenState extends State<PoseCoachScreen> {
     if (_cameraController == null || !_cameraReady) return;
     
     try {
-      await _cameraController!.startVideoRecording();
       _recordingStartTime = DateTime.now();
       _recordedPoseData.clear();
       
@@ -307,11 +308,6 @@ class _PoseCoachScreenState extends State<PoseCoachScreen> {
     _heartbeatTimer?.cancel();
     _plankTimer?.cancel();
     
-    XFile? videoFile;
-    if (_isRecording) {
-      videoFile = await _cameraController?.stopVideoRecording();
-    }
-
     setState(() {
       _detecting = false;
       _isRecording = false;
@@ -320,12 +316,10 @@ class _PoseCoachScreenState extends State<PoseCoachScreen> {
       _phase = '';
     });
 
-    if (videoFile != null) {
-      _saveSetResults(videoFile);
-    }
+    _saveSetResults();
   }
 
-  void _saveSetResults(XFile videoFile) async {
+  void _saveSetResults() async {
     // In a real app, you'd upload videoFile.path to Cloudinary here
     // For this implementation, we'll send the pose_data to Django.
     if (widget.userData == null || widget.password == null) return;
@@ -799,6 +793,19 @@ class _PoseCoachScreenState extends State<PoseCoachScreen> {
                 fontWeight: FontWeight.bold, letterSpacing: 2)),
         actions: [
           IconButton(
+            icon: const Icon(Icons.flip_camera_ios, color: FQColors.purple),
+            tooltip: 'Flip camera',
+            onPressed: () {
+              setState(() {
+                _cameraDirection = (_cameraDirection == CameraLensDirection.front)
+                    ? CameraLensDirection.back
+                    : CameraLensDirection.front;
+                _cameraReady = false;
+              });
+              _initCamera();
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.swap_horiz, color: FQColors.purple),
             tooltip: 'Change exercise',
             onPressed: () {
@@ -829,6 +836,34 @@ class _PoseCoachScreenState extends State<PoseCoachScreen> {
                       style: GoogleFonts.rajdhani(
                           color: FQColors.muted, fontSize: 16)),
                 ]),
+              ),
+            ),
+
+          // Bounding box guide (only when not detecting)
+          if (!_detecting)
+            Center(
+              child: Container(
+                width: MediaQuery.of(context).size.width * 0.8,
+                height: MediaQuery.of(context).size.height * 0.7,
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: FQColors.purple.withOpacity(0.3),
+                    width: 2,
+                    style: BorderStyle.solid,
+                  ),
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Center(
+                  child: Text(
+                    'POSITION FULL BODY INSIDE',
+                    style: GoogleFonts.rajdhani(
+                      color: FQColors.purple.withOpacity(0.5),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                ),
               ),
             ),
 

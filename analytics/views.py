@@ -1,4 +1,5 @@
 import re
+import math
 from datetime import date, timedelta
 
 from django.conf import settings
@@ -133,6 +134,8 @@ class BodyProgressListView(APIView):
             'chest_cm': e.chest_cm,
             'arms_cm': e.arms_cm,
             'thighs_cm': e.thighs_cm,
+            'neck_cm': e.neck_cm,
+            'hips_cm': e.hips_cm,
             'ai_analysis': e.ai_analysis,
             'body_fat_estimate': e.body_fat_estimate,
         }
@@ -156,6 +159,8 @@ class BodyProgressListView(APIView):
         chest = request.data.get('chest_cm')
         arms = request.data.get('arms_cm')
         thighs = request.data.get('thighs_cm')
+        neck = request.data.get('neck_cm')
+        hips = request.data.get('hips_cm')
         manual_body_fat = request.data.get('manual_body_fat')
 
         # Handle file uploads
@@ -246,6 +251,16 @@ class BodyProgressListView(APIView):
             except (ValueError, TypeError):
                 pass
 
+        # Navy Body Fat Formula
+        if body_fat_estimate is None and waist and neck and request.user.height:
+            try:
+                if request.user.gender == 'female' and hips:
+                    body_fat_estimate = 495.0 / (1.29579 - 0.35004 * math.log10(float(waist) + float(hips) - float(neck)) + 0.22100 * math.log10(float(request.user.height))) - 450.0
+                else:
+                    body_fat_estimate = 495.0 / (1.0324 - 0.19077 * math.log10(float(waist) - float(neck)) + 0.15456 * math.log10(float(request.user.height))) - 450.0
+            except (ValueError, ZeroDivisionError):
+                pass
+
         entry = BodyProgressEntry.objects.create(
             user=request.user,
             weight_kg=weight,
@@ -253,6 +268,8 @@ class BodyProgressListView(APIView):
             chest_cm=chest,
             arms_cm=arms,
             thighs_cm=thighs,
+            neck_cm=neck,
+            hips_cm=hips,
             photo_front_b64=photo_front_b64,
             photo_side_b64=photo_side_b64,
             photo_back_b64=photo_back_b64,
