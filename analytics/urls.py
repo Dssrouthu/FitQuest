@@ -5,7 +5,7 @@ from .views import (
     BodyProgressDeleteView, PhotoGalleryView, AthleteBodyProgressView,
     HeartbeatView, TeamActivityView, LogSetView, MySetLogsView,
     AthleteSetLogsView, AthleteAnalyticsSummaryView, SelfTransformationsView,
-    DailySummaryView,
+    DailySummaryView, GhostDuelView,
 )
 
 router = DefaultRouter()
@@ -23,6 +23,7 @@ urlpatterns = [
     path('team-activity/', TeamActivityView.as_view(), name='team-activity'),
     path('log-set/', LogSetView.as_view(), name='log-set'),
     path('my-sets/', MySetLogsView.as_view(), name='my-sets'),
+    path('ghost-duel/<int:set_id>/', GhostDuelView.as_view(), name='ghost-duel'),
     path('athlete/<int:athlete_id>/sets/', AthleteSetLogsView.as_view(), name='athlete-sets'),
     path('athlete/<int:athlete_id>/summary/', AthleteAnalyticsSummaryView.as_view(), name='athlete-summary'),
     path('my-transformations/', SelfTransformationsView.as_view(), name='my-transformations'),

@@ -14,5 +14,5 @@ class RecoveryScoreSerializer(serializers.ModelSerializer):
 class AICoachMessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = AICoachMessage
-        fields = ['id', 'message', 'intervention_type', 'is_read', 'created_at']
-        read_only_fields = ['id', 'intervention_type', 'created_at']
+        fields = ['id', 'message', 'intervention_type', 'is_read', 'created_at', 'suggested_exercise_name', 'suggestion_accepted']
+        read_only_fields = ['id', 'intervention_type', 'created_at', 'suggested_exercise_name']

@@ -111,6 +111,9 @@ class WorkoutSetLog(models.Model):
     effectiveness = models.CharField(max_length=20, choices=EFFECTIVENESS_CHOICES)
     video_url = models.URLField(max_length=500, null=True, blank=True)
     pose_data = models.JSONField(null=True, blank=True)
+    mistakes = models.CharField(max_length=255, blank=True, null=True) # e.g. "KNEES_CAVING,HIPS_SAGGING"
+    voice_note = models.TextField(blank=True, null=True) # For "Voice Runes"
+    xp_multiplier = models.FloatField(default=1.0) # For "Battle Rhythm" perfect timing
     logged_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

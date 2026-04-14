@@ -23,12 +23,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-i24bh87i=+0kjf=u&(6#c!jpi)94ku)h=!q^9cd#-&87bwk@7*')
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-default-change-me-in-production')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', 'False') == 'True'
+DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
 
 
 # Application definition
@@ -45,7 +45,7 @@ INSTALLED_APPS = [
 
     # Third-party libraries
     'rest_framework',
-    'rest_framework.authtoken',  # ✅ Added correctly (Token Auth)
+    'rest_framework.authtoken',
     'rest_framework_simplejwt',
     'corsheaders',
 
@@ -97,17 +97,18 @@ WSGI_APPLICATION = 'fitquest_backend.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME':     os.environ.get('DB_NAME',     'fitquest_db'),
-        'USER':     os.environ.get('DB_USER',     'postgres'),
-        'PASSWORD': os.environ.get('DB_PASSWORD', 'Saiteja@007'),
-        'HOST':     os.environ.get('DB_HOST',     'localhost'),
-        'PORT':     os.environ.get('DB_PORT',     '5432'),
-        'CONN_MAX_AGE': 60,  # persistent connections — use Supabase session-mode URL (port 5432)
+DATABASE_URL = os.environ.get('DATABASE_URL')
+if DATABASE_URL:
+    DATABASES = {
+        'default': dj_database_url.config(conn_max_age=60, ssl_require=True)
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 # Password validation
@@ -164,12 +165,12 @@ AUTH_USER_MODEL = 'users.CustomUser'
 # REST Framework Configuration (Merged & Fixed)
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.BasicAuthentication',  # ✅ For Admin/Flutter Basic Auth
-        'rest_framework.authentication.SessionAuthentication', # ✅ For Browser Login
-        'rest_framework.authentication.TokenAuthentication',   # ✅ For Token Auth (optional future use)
+        'rest_framework.authentication.BasicAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.TokenAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny', # Default to open, we lock specific views manually
+        'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 10,
@@ -184,7 +185,8 @@ SIMPLE_JWT = {
 }
 
 # CORS Config
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',') if os.environ.get('CORS_ALLOWED_ORIGINS') else []
+CORS_ALLOW_ALL_ORIGINS = os.environ.get('CORS_ALLOW_ALL_ORIGINS', 'True').lower() == 'true'
 
-# Gemini API Key (used by analytics/views.py for body scan analysis)
-GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', 'AIzaSyDQnQBt_F4LCxyxTu_IInw7NKi8VytygdY')
+# Gemini API Key
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')

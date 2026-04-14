@@ -39,6 +39,10 @@ dependencies:
   # Charts (analytics screen)
   fl_chart: ^0.68.0
 
+  # Audio & Voice
+  audioplayers: ^5.2.1
+  speech_to_text: ^6.6.2
+
   # Launch URLs / YouTube videos
   url_launcher: ^6.3.2
 
@@ -48,10 +52,15 @@ dependencies:
   path_provider: ^2.1.5
   video_player: ^2.11.1
 
-dev_dependencies:
+  dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^2.0.0
 
-flutter:
+  flutter:
   uses-material-design: true
+
+  assets:
+    - assets/audio/coin_ping.mp3
+    - assets/audio/tavern_ambience.mp3
+    - assets/audio/battle_drums.mp3

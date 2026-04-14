@@ -138,7 +138,7 @@ class CompleteQuestView(APIView):
         # Award XP and coins
         recruit = request.user
         recruit.xp    += quest.xp_reward
-        recruit.coins += quest.coin_reward
+        recruit.coin_balance += quest.coin_reward
 
         # Simple level-up: every 500 XP = 1 level
         recruit.level = max(1, recruit.xp // 500 + 1)
@@ -147,7 +147,7 @@ class CompleteQuestView(APIView):
         return Response({
             'message':     f'Quest complete! +{quest.xp_reward} XP, +{quest.coin_reward} coins',
             'new_xp':      recruit.xp,
-            'new_coins':   recruit.coins,
+            'new_coins':   recruit.coin_balance,
             'new_level':   recruit.level,
             'xp_reward':   quest.xp_reward,
             'coin_reward': quest.coin_reward,
@@ -254,14 +254,14 @@ class CompleteDailyQuestView(APIView):
 
         recruit = request.user
         recruit.xp += xp_reward
-        recruit.coins += coin_reward
+        recruit.coin_balance += coin_reward
         recruit.level = max(1, recruit.xp // 500 + 1)
         recruit.save()
 
         return Response({
             'message': f'+{xp_reward} XP, +{coin_reward} coins',
             'new_xp': recruit.xp,
-            'new_coins': recruit.coins,
+            'new_coins': recruit.coin_balance,
             'new_level': recruit.level,
             'xp_reward': xp_reward,
             'coin_reward': coin_reward,

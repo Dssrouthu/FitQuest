@@ -41,6 +41,28 @@ class _AICoachInboxScreenState extends State<AICoachInboxScreen> {
     } catch (_) {}
   }
 
+  void _acceptSuggestion(int messageId, String exercise) async {
+    setState(() => _loading = true);
+    try {
+      await AICoachService.acceptSuggestion(
+          widget.userData['username'], widget.password, messageId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('"$exercise" added to your workout plan!'), 
+          backgroundColor: FQColors.green)
+        );
+      }
+      _load();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${e.toString()}'), backgroundColor: FQColors.red)
+        );
+      }
+      setState(() => _loading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -80,6 +102,8 @@ class _AICoachInboxScreenState extends State<AICoachInboxScreen> {
   Widget _buildMessageCard(Map<String, dynamic> msg) {
     final bool isRead = msg['is_read'] == true;
     final String type = msg['intervention_type'] ?? 'recovery';
+    final String? suggestion = msg['suggested_exercise_name'];
+    final bool accepted = msg['suggestion_accepted'] == true;
     
     return GestureDetector(
       onTap: () => _markAsRead(msg['id']),
@@ -122,6 +146,37 @@ class _AICoachInboxScreenState extends State<AICoachInboxScreen> {
                   const SizedBox(height: 8),
                   Text(msg['message'], style: const TextStyle(
                       color: Colors.white, fontSize: 14, height: 1.4)),
+                  
+                  if (suggestion != null && !accepted)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 14),
+                      child: ElevatedButton.icon(
+                        onPressed: () => _acceptSuggestion(msg['id'], suggestion),
+                        icon: const Icon(Icons.add, size: 16),
+                        label: Text('ADD $suggestion TO PLAN',
+                            style: GoogleFonts.rajdhani(
+                                fontWeight: FontWeight.bold, fontSize: 12)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.purpleAccent,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                    )
+                  else if (accepted)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 14),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.check_circle, color: FQColors.green, size: 16),
+                          const SizedBox(width: 6),
+                          Text('SUGGESTION ADDED', style: GoogleFonts.rajdhani(
+                              color: FQColors.green, fontSize: 12, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+
                   const SizedBox(height: 12),
                   Text(msg['created_at'].toString().substring(0, 10),
                       style: const TextStyle(color: FQColors.muted, fontSize: 11)),

@@ -30,4 +30,17 @@ class AICoachService {
       throw Exception('Failed to mark message as read');
     }
   }
+
+  static Future<void> acceptSuggestion(String username, String password, int messageId) async {
+    String basicAuth = 'Basic ' + base64Encode(utf8.encode('$username:$password'));
+    final response = await http.post(
+      Uri.parse('$baseUrl/ai-services/messages/$messageId/accept_suggestion/'),
+      headers: {"Content-Type": "application/json", "Authorization": basicAuth},
+    );
+
+    if (response.statusCode != 200) {
+      final body = jsonDecode(response.body);
+      throw Exception(body['error'] ?? 'Failed to accept suggestion');
+    }
+  }
 }

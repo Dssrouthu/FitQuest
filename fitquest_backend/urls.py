@@ -4,11 +4,16 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.http import JsonResponse
 
+from django.views.decorators.csrf import csrf_exempt
+
+@csrf_exempt
 def health_check(request):
-    return JsonResponse({"status": "ok"})
+    return JsonResponse({"status": "ok", "message": "FitQuest API is running"})
 
 urlpatterns = [
+    path('', health_check), # Root also returns health check
     path('health/', health_check),
+    path('health', health_check),
     path('admin/', admin.site.urls),
     
     # Connect our apps here:

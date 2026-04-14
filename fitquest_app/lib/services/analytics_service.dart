@@ -242,4 +242,19 @@ class AnalyticsService {
     }
     throw Exception('Failed to load transformations');
   }
+
+  // ── Ghost Duels (AR PvP) ──────────────────────────────────────────────────
+  static Future<Map<String, dynamic>> fetchGhostDuelData(
+      String u, String p, int setId) async {
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/analytics/ghost-duel/$setId/'),
+          headers: _headers(u, p),
+        )
+        .timeout(_kTimeout);
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(jsonDecode(response.body));
+    }
+    throw Exception('Failed to load ghost duel data');
+  }
 }

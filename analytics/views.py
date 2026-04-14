@@ -70,7 +70,7 @@ class WorkoutLogViewSet(viewsets.ModelViewSet):
                 if created:
                     # Award rewards (matching CompleteDailyQuestView logic)
                     user.xp += 100
-                    user.coins += 10
+                    user.coin_balance += 10
                     user.level = max(1, user.xp // 500 + 1)
                     user.save()
 
@@ -465,6 +465,9 @@ class LogSetView(APIView):
         set_type = request.data.get('set_type', 'Regular')
         video_url = request.data.get('video_url')
         pose_data = request.data.get('pose_data')
+        mistakes = request.data.get('mistakes', '')
+        voice_note = request.data.get('voice_note', '')
+        xp_multiplier = float(request.data.get('xp_multiplier', 1.0))
 
         if not exercise_name or reps is None:
             return Response({'error': 'exercise_name and reps required'}, status=400)
@@ -490,7 +493,45 @@ class LogSetView(APIView):
             effectiveness=effectiveness,
             video_url=video_url,
             pose_data=pose_data,
+            mistakes=mistakes,
+            voice_note=voice_note,
+            xp_multiplier=xp_multiplier,
         )
+
+        # Award Gamification Rewards (XP/Coins)
+        user = request.user
+        base_xp = 20
+        base_coins = 2
+        
+        # Bonus for perfect timing (Battle Rhythm)
+        earned_xp = int(base_xp * xp_multiplier)
+        earned_coins = int(base_coins * xp_multiplier)
+        
+        # Bonus for "Just Right" or "Hard" sets
+        if effectiveness in ['Just Right', 'Hard']:
+            earned_xp += 10
+        
+        user.xp += earned_xp
+        user.coin_balance += earned_coins
+        user.level = max(1, user.xp // 500 + 1)
+
+        # ── THE ANVIL: Aggregating Muscle Volume ──
+        if weight_kg and int(reps) > 0:
+            vol = int(float(weight_kg) * int(reps))
+            # Simple heuristic mapping for the Anvil
+            ex_lower = exercise_name.lower()
+            muscle_group = "Other"
+            if any(x in ex_lower for x in ['squat', 'lunge', 'leg', 'deadlift', 'calf']): muscle_group = "Legs"
+            elif any(x in ex_lower for x in ['press', 'pushup', 'fly', 'chest']): muscle_group = "Chest"
+            elif any(x in ex_lower for x in ['row', 'pull', 'chin', 'back']): muscle_group = "Back"
+            elif any(x in ex_lower for x in ['curl', 'extension', 'arm', 'dip']): muscle_group = "Arms"
+            elif any(x in ex_lower for x in ['plank', 'crunch', 'core', 'situp']): muscle_group = "Core"
+            elif any(x in ex_lower for x in ['shoulder', 'lateral', 'ohp']): muscle_group = "Shoulders"
+
+            if not user.muscle_volume: user.muscle_volume = {}
+            user.muscle_volume[muscle_group] = user.muscle_volume.get(muscle_group, 0) + vol
+
+        user.save()
 
         # Contribution to Guild Co-Op Quest (Weight)
         if weight_kg and int(reps) > 0:
@@ -729,7 +770,7 @@ class AthleteAnalyticsSummaryView(APIView):
                 'username': athlete.username,
                 'level': athlete.level,
                 'xp': athlete.xp,
-                'coins': athlete.coins,
+                'coins': athlete.coin_balance,
             },
             'latest_body_progress': latest_body_data,
             'weight_history': weight_history,
@@ -742,6 +783,24 @@ class AthleteAnalyticsSummaryView(APIView):
 
 
 # ── Self Transformations (Recruit self-view) ──────────────────────────────────
+class GhostDuelView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, set_id):
+        try:
+            # Allow fetching any set log for a Ghost Duel (social feature)
+            log = WorkoutSetLog.objects.get(id=set_id)
+            return Response({
+                'id': log.id,
+                'username': log.user.username,
+                'exercise_name': log.exercise_name,
+                'reps': log.reps,
+                'pose_data': log.pose_data,
+            })
+        except WorkoutSetLog.DoesNotExist:
+            return Response({'error': 'Workout set not found'}, status=404)
+
+
 class SelfTransformationsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -809,6 +868,12 @@ class SelfTransformationsView(APIView):
         } for a in daily_qs]
 
         return Response({
+            'user_stats': {
+                'username': user.username,
+                'level': user.level,
+                'xp': user.xp,
+                'muscle_volume': user.muscle_volume,
+            },
             'body_progress': body_data,
             'set_logs': set_logs,
             'daily_activity': daily_data,

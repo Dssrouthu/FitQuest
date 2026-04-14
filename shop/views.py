@@ -92,19 +92,19 @@ class PurchaseItemView(APIView):
                 {'error': 'Item not available from your coach'},
                 status=status.HTTP_403_FORBIDDEN)
 
-        if recruit.coins < item.coin_price:
+        if recruit.coin_balance < item.coin_price:
             return Response(
-                {'error': f'Not enough coins (need {item.coin_price}, have {recruit.coins})'},
+                {'error': f'Not enough coins (need {item.coin_price}, have {recruit.coin_balance})'},
                 status=status.HTTP_400_BAD_REQUEST)
 
-        recruit.coins -= item.coin_price
+        recruit.coin_balance -= item.coin_price
         recruit.save()
 
         purchase = Purchase.objects.create(recruit=recruit, item=item)
 
         return Response({
             'message':    f'Purchased {item.name}!',
-            'new_coins':  recruit.coins,
+            'new_coins':  recruit.coin_balance,
             'purchase_id': purchase.id,
         })
 
@@ -230,18 +230,18 @@ class SCServicePurchaseView(APIView):
             return Response({'error': 'Service not found'}, status=404)
 
         recruit = request.user
-        if recruit.coins < service.coin_price:
+        if recruit.coin_balance < service.coin_price:
             return Response({
-                'error': f'Not enough coins (need {service.coin_price}, have {recruit.coins})'
+                'error': f'Not enough coins (need {service.coin_price}, have {recruit.coin_balance})'
             }, status=400)
 
-        recruit.coins -= service.coin_price
+        recruit.coin_balance -= service.coin_price
         recruit.save()
 
         purchase = ServicePurchase.objects.create(recruit=recruit, service=service)
         return Response({
             'message': f'Purchased {service.name}!',
-            'new_coins': recruit.coins,
+            'new_coins': recruit.coin_balance,
             'purchase_id': purchase.id,
         })
 

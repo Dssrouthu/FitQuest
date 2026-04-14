@@ -47,6 +47,10 @@ class CustomUser(AbstractUser):
     level = models.IntegerField(default=1)
     coin_balance = models.IntegerField(default=0)
 
+    # Biometrics for 'The Anvil'
+    # Stores cumulative volume (weight * reps) per muscle group
+    muscle_volume = models.JSONField(default=dict, blank=True) 
+
     PLAYER_CLASS_CHOICES = (
         ('Vanguard', 'Vanguard'),
         ('Assassin', 'Assassin'),

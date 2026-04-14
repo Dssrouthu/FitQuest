@@ -151,7 +151,7 @@ class AthleteAnalyticsView(APIView):
         return Response({
             'xp':                 recruit.xp,
             'level':              recruit.level,
-            'coins':              recruit.coins,
+            'coins':              recruit.coin_balance,
             'workout_plans':      recruit.assigned_plans.count(),
             'diet_plans':         recruit.assigned_diet_plans.count(),
             'quests_completed':   completions.count(),
