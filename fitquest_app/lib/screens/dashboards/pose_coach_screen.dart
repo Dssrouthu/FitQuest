@@ -44,7 +44,6 @@ const _exercises = [
       cameraPlacement: 'Place phone at shoulder height on the side, ~1.5m away.',
       steps: ['Hands shoulder-width apart', 'Keep body straight (plank position)', 'Lower chest to floor', 'Push back up to full extension'],
       restTime: 60),
-  // ... other exercises ...
   _Exercise('plank', 'Plank', 'Core', Icons.horizontal_rule,
       difficulty: 'Beginner',
       cameraPlacement: 'Place phone at ground level on the side, ~2m away.',
@@ -67,17 +66,11 @@ class _PoseCoachScreenState extends State<PoseCoachScreen> with TickerProviderSt
   CameraController? _cameraController;
   PoseDetector? _poseDetector;
   List<Pose> _poses = [];
-  bool _isDetecting = false;
   bool _cameraReady = false;
-  bool _detecting = false;
+  bool _isDetecting = false;
   String _hint = 'TAP START to begin';
   _Exercise? _selectedExercise;
   CameraLensDirection _cameraDirection = CameraLensDirection.front;
-
-  // Performance & Smoothing
-  int _frameCount = 0;
-  final Map<PoseLandmarkType, List<Offset>> _smaBuffers = {};
-  static const int _smaSize = 5;
 
   // Recording & Pose Data
   bool _isRecording = false;
@@ -89,25 +82,16 @@ class _PoseCoachScreenState extends State<PoseCoachScreen> with TickerProviderSt
   bool _inDownPhase = false;
   String _phase = '';
   Set<String> _mistakesInSet = {}; 
-  Timer? _heartbeatTimer;
 
-  // ── NEW FEATURES STATE ─────────────────────────────────────────────────────
-  
   // Audio (Bard's Tavern & Loot Drops)
   final AudioPlayer _ambientPlayer = AudioPlayer();
   final AudioPlayer _sfxPlayer = AudioPlayer();
   bool _isAmbientPlaying = false;
 
-  // Loot Drops
-  int _consecutivePerfectReps = 0;
-  bool _showLootAnimation = false;
-  late AnimationController _lootController;
-
   // Battle Rhythm (Rest Timer)
   bool _isResting = false;
   int _restSecondsRemaining = 0;
   Timer? _restTimer;
-  double _xpMultiplier = 1.0;
 
   // Voice Runes (Speech to Text)
   final stt.SpeechToText _speech = stt.SpeechToText();
@@ -125,10 +109,73 @@ class _PoseCoachScreenState extends State<PoseCoachScreen> with TickerProviderSt
 
   @override
   void initState() {
-    // ... (initState logic) ...
+    super.initState();
+    _poseDetector = PoseDetector(options: PoseDetectorOptions());
   }
 
-  // ... (audio/speech/camera init same) ...
+  @override
+  void dispose() {
+    _cameraController?.dispose();
+    _poseDetector?.close();
+    _ambientPlayer.dispose();
+    _sfxPlayer.dispose();
+    _restTimer?.cancel();
+    _plankTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _initCamera() async {
+    final cameras = await availableCameras();
+    final camera = cameras.firstWhere(
+      (c) => c.lensDirection == _cameraDirection,
+      orElse: () => cameras.first,
+    );
+
+    _cameraController = CameraController(camera, ResolutionPreset.medium, enableAudio: false);
+    await _cameraController!.initialize();
+    if (!mounted) return;
+
+    setState(() => _cameraReady = true);
+
+    _cameraController!.startImageStream((image) {
+      if (_isDetecting) return;
+      _isDetecting = true;
+      _processImage(image);
+    });
+  }
+
+  Future<void> _processImage(CameraImage image) async {
+    if (_poseDetector == null) return;
+    
+    final inputImage = InputImage.fromBytes(
+      bytes: image.planes[0].bytes,
+      metadata: InputImageMetadata(
+        size: Size(image.width.toDouble(), image.height.toDouble()),
+        rotation: InputImageRotation.rotation270deg,
+        format: InputImageFormatValue.fromRawValue(image.format.raw) ?? InputImageFormat.nv21,
+        bytesPerRow: image.planes[0].bytesPerRow,
+      ),
+    );
+
+    final poses = await _poseDetector!.processImage(inputImage);
+    
+    if (mounted) {
+      setState(() {
+        _poses = poses;
+        _isDetecting = false;
+      });
+    }
+  }
+
+  void _playAmbient(bool loop) async {
+    // await _ambientPlayer.setReleaseMode(loop ? ReleaseMode.loop : ReleaseMode.release);
+    setState(() => _isAmbientPlaying = true);
+  }
+
+  void _stopAmbient() async {
+    await _ambientPlayer.stop();
+    setState(() => _isAmbientPlaying = false);
+  }
 
   void _selectExercise(_Exercise ex) async {
     final start = await showModalBottomSheet<bool>(
@@ -139,7 +186,6 @@ class _PoseCoachScreenState extends State<PoseCoachScreen> with TickerProviderSt
     );
     if (start != true || !mounted) return;
 
-    // Optional: Ask if they want to duel a ghost
     final duelId = await _promptGhostDuel();
 
     setState(() {
@@ -148,11 +194,8 @@ class _PoseCoachScreenState extends State<PoseCoachScreen> with TickerProviderSt
       _plankSeconds = 0;
       _inDownPhase = false;
       _phase = '';
-      _frameCount = 0;
-      _smaBuffers.clear();
       _recordedPoseData.clear();
       _mistakesInSet.clear();
-      _consecutivePerfectReps = 0;
       _isResting = false;
       _isGhostDuel = duelId != null;
     });
@@ -174,7 +217,7 @@ class _PoseCoachScreenState extends State<PoseCoachScreen> with TickerProviderSt
           backgroundColor: FQColors.surface,
           title: Text('GHOST DUEL?', style: GoogleFonts.rajdhani(color: Colors.white, fontWeight: FontWeight.bold)),
           content: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Text('Enter a Set ID to duel a Guildmate\'s "Ghost Skeleton" in AR.', style: TextStyle(color: FQColors.muted, fontSize: 12)),
+            const Text('Enter a Set ID to duel a Guildmate\'s "Ghost Skeleton".', style: TextStyle(color: FQColors.muted, fontSize: 12)),
             const SizedBox(height: 16),
             TextField(
               controller: ctrl,
@@ -200,11 +243,9 @@ class _PoseCoachScreenState extends State<PoseCoachScreen> with TickerProviderSt
         _ghostUsername = data['username'];
       });
     } catch (e) {
-      print("Ghost load error: $e");
+      debugPrint("Ghost load error: $e");
     }
   }
-
-  // ... (startDetection same but reset ghost state) ...
 
   @override
   Widget build(BuildContext context) {
@@ -217,7 +258,10 @@ class _PoseCoachScreenState extends State<PoseCoachScreen> with TickerProviderSt
         foregroundColor: Colors.white,
         title: Text(_isGhostDuel ? 'DUEL: VS ${_ghostUsername?.toUpperCase()}' : 'POSE COACH', style: GoogleFonts.rajdhani(fontWeight: FontWeight.bold)),
         actions: [
-          IconButton(icon: const Icon(Icons.music_note, color: FQColors.purple), onPressed: () => _isAmbientPlaying ? _stopAmbient() : _playAmbient(false)),
+          IconButton(
+            icon: Icon(Icons.music_note, color: _isAmbientPlaying ? FQColors.purple : Colors.white), 
+            onPressed: () => _isAmbientPlaying ? _stopAmbient() : _playAmbient(false)
+          ),
           IconButton(icon: const Icon(Icons.close), onPressed: () => setState(() => _selectedExercise = null)),
         ],
       ),
@@ -226,7 +270,6 @@ class _PoseCoachScreenState extends State<PoseCoachScreen> with TickerProviderSt
         children: [
           if (_cameraReady && _cameraController != null) CameraPreview(_cameraController!),
           
-          // Pose skeleton overlay
           if (_poses.isNotEmpty && _cameraController != null)
             CustomPaint(
               painter: _PosePainter(
@@ -240,8 +283,17 @@ class _PoseCoachScreenState extends State<PoseCoachScreen> with TickerProviderSt
                 currentTimestampMs: _isRecording ? DateTime.now().difference(_recordingStartTime!).inMilliseconds : 0,
               ),
             ),
-
-          // ... (rest of build overlays) ...
+          
+          Positioned(
+            bottom: 40, left: 0, right: 0,
+            child: Center(
+              child: Text(_hint, style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold, backgroundColor: Colors.black54)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildExerciseSelector() {
     return Scaffold(
@@ -252,6 +304,8 @@ class _PoseCoachScreenState extends State<PoseCoachScreen> with TickerProviderSt
         itemCount: _exercises.length,
         itemBuilder: (_, i) => ListTile(
           title: Text(_exercises[i].name, style: const TextStyle(color: Colors.white)),
+          leading: Icon(_exercises[i].icon, color: FQColors.cyan),
+          subtitle: Text(_exercises[i].muscle, style: const TextStyle(color: FQColors.muted)),
           onTap: () => _selectExercise(_exercises[i]),
         ),
       ),
@@ -259,20 +313,28 @@ class _PoseCoachScreenState extends State<PoseCoachScreen> with TickerProviderSt
   }
 }
 
-class _AnalysisResult {
-  final String hint;
-  final String phase;
-  final bool countRep;
-  final List<String> mistakes;
-  _AnalysisResult(this.hint, this.phase, this.countRep, this.mistakes);
-}
-
-// ... _ExerciseTipSheet and _PosePainter (Include from previous version) ...
 class _ExerciseTipSheet extends StatelessWidget {
   final _Exercise exercise;
   const _ExerciseTipSheet({required this.exercise});
   @override
-  Widget build(BuildContext context) { return Container(height: 300, color: FQColors.surface, child: Center(child: ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('START')))); }
+  Widget build(BuildContext context) { 
+    return Container(
+      height: 400, 
+      padding: const EdgeInsets.all(24),
+      decoration: const BoxDecoration(color: FQColors.surface, borderRadius: BorderRadius.vertical(top: Radius.circular(20))), 
+      child: Column(children: [
+        Text(exercise.name.toUpperCase(), style: GoogleFonts.rajdhani(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
+        const SizedBox(height: 10),
+        Text(exercise.cameraPlacement, style: const TextStyle(color: FQColors.cyan, fontSize: 13), textAlign: TextAlign.center),
+        const Spacer(),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, true), 
+          style: ElevatedButton.styleFrom(backgroundColor: FQColors.cyan, foregroundColor: Colors.black),
+          child: const Text('START SESSION')
+        )
+      ])
+    ); 
+  }
 }
 
 class _PosePainter extends CustomPainter {
@@ -292,7 +354,6 @@ class _PosePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // ── DRAW ACTIVE SKELETON (PURPLE) ──
     final jointPaint = Paint()..color = FQColors.purple..strokeWidth = 6..style = PaintingStyle.fill;
     final bonePaint = Paint()..color = FQColors.purple.withOpacity(0.7)..strokeWidth = 3..style = PaintingStyle.stroke;
 
@@ -303,7 +364,7 @@ class _PosePainter extends CustomPainter {
         canvas.drawCircle(Offset(x, y), 5, jointPaint);
       }
 
-      void _drawActiveLine(PoseLandmarkType a, PoseLandmarkType b) {
+      void drawLine(PoseLandmarkType a, PoseLandmarkType b) {
         final lmA = pose.landmarks[a];
         final lmB = pose.landmarks[b];
         if (lmA == null || lmB == null) return;
@@ -313,17 +374,25 @@ class _PosePainter extends CustomPainter {
           bonePaint,
         );
       }
-      _drawTorso(_drawActiveLine);
-      _drawArms(_drawActiveLine);
-      _drawLegs(_drawActiveLine);
+      
+      drawLine(PoseLandmarkType.leftShoulder, PoseLandmarkType.rightShoulder);
+      drawLine(PoseLandmarkType.leftShoulder, PoseLandmarkType.leftHip);
+      drawLine(PoseLandmarkType.rightShoulder, PoseLandmarkType.rightHip);
+      drawLine(PoseLandmarkType.leftHip, PoseLandmarkType.rightHip);
+      drawLine(PoseLandmarkType.leftShoulder, PoseLandmarkType.leftElbow);
+      drawLine(PoseLandmarkType.leftElbow, PoseLandmarkType.leftWrist);
+      drawLine(PoseLandmarkType.rightShoulder, PoseLandmarkType.rightElbow);
+      drawLine(PoseLandmarkType.rightElbow, PoseLandmarkType.rightWrist);
+      drawLine(PoseLandmarkType.leftHip, PoseLandmarkType.leftKnee);
+      drawLine(PoseLandmarkType.leftKnee, PoseLandmarkType.leftAnkle);
+      drawLine(PoseLandmarkType.rightHip, PoseLandmarkType.rightKnee);
+      drawLine(PoseLandmarkType.rightKnee, PoseLandmarkType.rightAnkle);
     }
 
-    // ── DRAW GHOST SKELETON (CYAN GLOW) ──
     if (ghostPoseData != null && ghostPoseData!.isNotEmpty) {
       final ghostJointPaint = Paint()..color = FQColors.cyan.withOpacity(0.5)..strokeWidth = 4;
       final ghostBonePaint = Paint()..color = FQColors.cyan.withOpacity(0.3)..strokeWidth = 2..style = PaintingStyle.stroke;
 
-      // Find closest frame in ghost data
       var ghostFrame = ghostPoseData!.first;
       for (var f in ghostPoseData!) {
         if (f['t'] <= currentTimestampMs) {
@@ -335,7 +404,7 @@ class _PosePainter extends CustomPainter {
 
       final Map<String, dynamic> landmarks = ghostFrame['p'];
       
-      void _drawGhostLine(String a, String b) {
+      void drawGhostLine(String a, String b) {
         if (landmarks[a] == null || landmarks[b] == null) return;
         final pA = landmarks[a];
         final pB = landmarks[b];
@@ -352,43 +421,19 @@ class _PosePainter extends CustomPainter {
         canvas.drawCircle(Offset(x, y), 3, ghostJointPaint);
       });
 
-      // Connections
-      _drawTorsoStrings(_drawGhostLine);
-      _drawArmsStrings(_drawGhostLine);
-      _drawLegsStrings(_drawGhostLine);
+      drawGhostLine('leftShoulder', 'rightShoulder');
+      drawGhostLine('leftShoulder', 'leftHip');
+      drawGhostLine('rightShoulder', 'rightHip');
+      drawGhostLine('leftHip', 'rightHip');
+      drawGhostLine('leftShoulder', 'leftElbow');
+      drawGhostLine('leftElbow', 'leftWrist');
+      drawGhostLine('rightShoulder', 'rightElbow');
+      drawGhostLine('rightElbow', 'rightWrist');
+      drawGhostLine('leftHip', 'leftKnee');
+      drawGhostLine('leftKnee', 'leftAnkle');
+      drawGhostLine('rightHip', 'rightKnee');
+      drawGhostLine('rightKnee', 'rightAnkle');
     }
-  }
-
-  void _drawTorso(Function(PoseLandmarkType, PoseLandmarkType) line) {
-    line(PoseLandmarkType.leftShoulder, PoseLandmarkType.rightShoulder);
-    line(PoseLandmarkType.leftShoulder, PoseLandmarkType.leftHip);
-    line(PoseLandmarkType.rightShoulder, PoseLandmarkType.rightHip);
-    line(PoseLandmarkType.leftHip, PoseLandmarkType.rightHip);
-  }
-  void _drawArms(Function(PoseLandmarkType, PoseLandmarkType) line) {
-    line(PoseLandmarkType.leftShoulder, PoseLandmarkType.leftElbow);
-    line(PoseLandmarkType.leftElbow, PoseLandmarkType.leftWrist);
-    line(PoseLandmarkType.rightShoulder, PoseLandmarkType.rightElbow);
-    line(PoseLandmarkType.rightElbow, PoseLandmarkType.rightWrist);
-  }
-  void _drawLegs(Function(PoseLandmarkType, PoseLandmarkType) line) {
-    line(PoseLandmarkType.leftHip, PoseLandmarkType.leftKnee);
-    line(PoseLandmarkType.leftKnee, PoseLandmarkType.leftAnkle);
-    line(PoseLandmarkType.rightHip, PoseLandmarkType.rightKnee);
-    line(PoseLandmarkType.rightKnee, PoseLandmarkType.rightAnkle);
-  }
-
-  void _drawTorsoStrings(Function(String, String) line) {
-    line('leftShoulder', 'rightShoulder'); line('leftShoulder', 'leftHip');
-    line('rightShoulder', 'rightHip'); line('leftHip', 'rightHip');
-  }
-  void _drawArmsStrings(Function(String, String) line) {
-    line('leftShoulder', 'leftElbow'); line('leftElbow', 'leftWrist');
-    line('rightShoulder', 'rightElbow'); line('rightElbow', 'rightWrist');
-  }
-  void _drawLegsStrings(Function(String, String) line) {
-    line('leftHip', 'leftKnee'); line('leftKnee', 'leftAnkle');
-    line('rightHip', 'rightKnee'); line('rightKnee', 'rightAnkle');
   }
 
   @override

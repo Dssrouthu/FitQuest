@@ -75,7 +75,25 @@ class _TransformationsScreenState extends State<TransformationsScreen> {
     }
   }
 
-  // ... (delta methods same) ...
+  double? _deltaWeight() {
+    if (_bodyProgress.length < 2) return null;
+    final latest = (_bodyProgress.first['weight_kg'] as num?)?.toDouble();
+    final oldest = (_bodyProgress.last['weight_kg'] as num?)?.toDouble();
+    if (latest == null || oldest == null) return null;
+    return latest - oldest;
+  }
+
+  double? _deltaBf() {
+    if (_bodyProgress.length < 2) return null;
+    final latest = (_bodyProgress.first['body_fat_estimate'] as num?)?.toDouble();
+    final oldest = (_bodyProgress.last['body_fat_estimate'] as num?)?.toDouble();
+    if (latest == null || oldest == null) return null;
+    return latest - oldest;
+  }
+
+  List<dynamic> _setsForDate(String dateStr) {
+    return _setLogs.where((s) => (s['date'] as String? ?? '') == dateStr).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -190,7 +208,6 @@ class _TransformationsScreenState extends State<TransformationsScreen> {
     );
   }
 
-  // ... (rest of methods same) ...
   Widget _summaryStrip() {
     final deltaW   = _deltaWeight();
     final deltaBf  = _deltaBf();
