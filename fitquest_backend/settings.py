@@ -103,11 +103,24 @@ if DATABASE_URL:
         'default': dj_database_url.config(conn_max_age=60, ssl_require=True)
     }
 else:
+    # Build database URL from individual environment variables (for Render)
+    db_name = os.environ.get('DB_NAME', 'fitquest_db')
+    db_user = os.environ.get('DB_USER', 'postgres')
+    db_pass = os.environ.get('DB_PASSWORD', 'Saiteja@007')
+    db_host = os.environ.get('DB_HOST', 'localhost')
+    db_port = os.environ.get('DB_PORT', '5432')
+
+    # If we have a DB_HOST that isn't localhost, we likely need SSL (production)
+    ssl_require = db_host != 'localhost'
+    
+    default_db_url = f"postgres://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
+    
     DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
+        'default': dj_database_url.config(
+            default=default_db_url,
+            conn_max_age=60,
+            ssl_require=ssl_require
+        )
     }
 
 
