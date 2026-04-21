@@ -1,16 +1,17 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:video_player/video_player.dart';
 import '../../main.dart';
 
 class PosePlaybackScreen extends StatefulWidget {
-  final String videoUrl;
+  final String? videoUrl;
   final List<dynamic> poseData;
 
   const PosePlaybackScreen({
     super.key,
-    required this.videoUrl,
+    this.videoUrl,
     required this.poseData,
   });
 
@@ -19,30 +20,88 @@ class PosePlaybackScreen extends StatefulWidget {
 }
 
 class _PosePlaybackScreenState extends State<PosePlaybackScreen> {
-  late VideoPlayerController _controller;
+  VideoPlayerController? _controller;
   bool _initialized = false;
   bool _showPose = true;
+  
+  // For no-video fallback
+  Timer? _playbackTimer;
+  int _currentTimeMs = 0;
+  int _totalDurationMs = 0;
+  bool _isPlaying = false;
 
   @override
   void initState() {
     super.initState();
-    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl))
+    if (widget.videoUrl != null && widget.videoUrl!.isNotEmpty) {
+      _initVideo();
+    } else {
+      _initSkeletonOnly();
+    }
+  }
+
+  void _initVideo() {
+    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl!))
       ..initialize().then((_) {
         setState(() {
           _initialized = true;
+          _totalDurationMs = _controller!.value.duration.inMilliseconds;
         });
-        _controller.play();
+        _controller!.play();
       });
     
-    _controller.addListener(() {
-      if (mounted) setState(() {});
+    _controller!.addListener(() {
+      if (mounted) {
+        setState(() {
+          _currentTimeMs = _controller!.value.position.inMilliseconds;
+          _isPlaying = _controller!.value.isPlaying;
+        });
+      }
+    });
+  }
+
+  void _initSkeletonOnly() {
+    if (widget.poseData.isNotEmpty) {
+      _totalDurationMs = widget.poseData.last['t'] ?? 5000;
+    }
+    setState(() {
+      _initialized = true;
+      _isPlaying = true;
+    });
+    _startTimer();
+  }
+
+  void _startTimer() {
+    _playbackTimer?.cancel();
+    _playbackTimer = Timer.periodic(const Duration(milliseconds: 30), (timer) {
+      if (_isPlaying) {
+        setState(() {
+          _currentTimeMs += 30;
+          if (_currentTimeMs >= _totalDurationMs) {
+            _currentTimeMs = 0;
+          }
+        });
+      }
     });
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _controller?.dispose();
+    _playbackTimer?.cancel();
     super.dispose();
+  }
+
+  void _togglePlayback() {
+    if (_controller != null) {
+      if (_controller!.value.isPlaying) {
+        _controller!.pause();
+      } else {
+        _controller!.play();
+      }
+    } else {
+      setState(() => _isPlaying = !_isPlaying);
+    }
   }
 
   @override
@@ -66,54 +125,74 @@ class _PosePlaybackScreenState extends State<PosePlaybackScreen> {
       ),
       body: Center(
         child: _initialized
-            ? AspectRatio(
-                aspectRatio: _controller.value.aspectRatio,
-                child: Stack(
-                  children: [
-                    VideoPlayer(_controller),
-                    if (_showPose)
-                      Positioned.fill(
-                        child: CustomPaint(
-                          painter: _PlaybackPosePainter(
-                            poseData: widget.poseData,
-                            currentTimestampMs: _controller.value.position.inMilliseconds,
-                          ),
+            ? Stack(
+                children: [
+                  if (_controller != null)
+                    AspectRatio(
+                      aspectRatio: _controller!.value.aspectRatio,
+                      child: VideoPlayer(_controller!),
+                    )
+                  else
+                    Container(
+                      width: double.infinity,
+                      height: double.infinity,
+                      color: Colors.black,
+                      child: const Center(
+                        child: Text('NO VIDEO RECORDED\n(SKELETON PLAYBACK ONLY)',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.white24, fontSize: 10)),
+                      ),
+                    ),
+                  
+                  if (_showPose)
+                    Positioned.fill(
+                      child: CustomPaint(
+                        painter: _PlaybackPosePainter(
+                          poseData: widget.poseData,
+                          currentTimestampMs: _currentTimeMs,
                         ),
                       ),
-                    
-                    // Controls overlay
-                    Positioned(
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      child: Container(
-                        padding: const EdgeInsets.all(10),
-                        color: Colors.black45,
-                        child: Column(mainAxisSize: MainAxisSize.min, children: [
-                          VideoProgressIndicator(_controller,
+                    ),
+                  
+                  // Controls overlay
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      color: Colors.black45,
+                      child: Column(mainAxisSize: MainAxisSize.min, children: [
+                        if (_controller != null)
+                          VideoProgressIndicator(_controller!,
                               allowScrubbing: true,
                               colors: const VideoProgressColors(
                                   playedColor: FQColors.purple,
-                                  bufferedColor: FQColors.muted)),
-                          Row(children: [
-                            IconButton(
-                              icon: Icon(_controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
-                                  color: Colors.white),
-                              onPressed: () => _controller.value.isPlaying
-                                  ? _controller.pause()
-                                  : _controller.play(),
-                            ),
-                            Text(
-                              '${_controller.value.position.inMinutes}:${(_controller.value.position.inSeconds % 60).toString().padLeft(2, '0')} / '
-                              '${_controller.value.duration.inMinutes}:${(_controller.value.duration.inSeconds % 60).toString().padLeft(2, '0')}',
-                              style: const TextStyle(color: Colors.white, fontSize: 12),
-                            ),
-                          ]),
+                                  bufferedColor: FQColors.muted))
+                        else
+                          Slider(
+                            value: _currentTimeMs.toDouble(),
+                            max: _totalDurationMs.toDouble(),
+                            onChanged: (v) => setState(() => _currentTimeMs = v.toInt()),
+                            activeColor: FQColors.purple,
+                            inactiveColor: FQColors.muted,
+                          ),
+                        Row(children: [
+                          IconButton(
+                            icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow,
+                                color: Colors.white),
+                            onPressed: _togglePlayback,
+                          ),
+                          Text(
+                            '${(_currentTimeMs ~/ 1000) ~/ 60}:${((_currentTimeMs ~/ 1000) % 60).toString().padLeft(2, '0')} / '
+                            '${(_totalDurationMs ~/ 1000) ~/ 60}:${((_totalDurationMs ~/ 1000) % 60).toString().padLeft(2, '0')}',
+                            style: const TextStyle(color: Colors.white, fontSize: 12),
+                          ),
                         ]),
-                      ),
+                      ]),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               )
             : const CircularProgressIndicator(color: FQColors.purple),
       ),

@@ -24,6 +24,25 @@ class CreateWorkoutView(generics.CreateAPIView):
         if user.role == 'RECRUIT':
             plan = serializer.save(coach=None)
             plan.assigned_to.add(user)
+
+            # Auto-schedule for recruits: every day of the week
+            from .models import WorkoutExercise, Exercise
+            days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+            
+            # Try to get some common exercises
+            default_exs = list(Exercise.objects.all()[:3])
+            if default_exs:
+                for i, day in enumerate(days):
+                    # Rotate between the exercises
+                    ex = default_exs[i % len(default_exs)]
+                    WorkoutExercise.objects.create(
+                        plan=plan,
+                        exercise=ex,
+                        day_label=day,
+                        order=1,
+                        sets=3,
+                        reps=10
+                    )
         else:
             serializer.save(coach=user)
 

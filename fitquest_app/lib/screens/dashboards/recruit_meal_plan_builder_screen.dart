@@ -183,58 +183,145 @@ class _RecruitMealPlanBuilderScreenState
     final protCtrl = TextEditingController();
     final carbCtrl = TextEditingController();
     final fatsCtrl = TextEditingController();
+    final unitNameCtrl = TextEditingController();
+    String measurementType = 'per_100g';
+    bool isAdding = false;
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: FQColors.surface,
-        title: Text('ADD NEW FOOD', style: GoogleFonts.rajdhani(color: Colors.white, fontWeight: FontWeight.bold)),
-        content: SingleChildScrollView(
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            _dialogField(nameCtrl, 'Food Name', Icons.restaurant),
-            Row(children: [
-              Expanded(child: _dialogField(calsCtrl, 'Calories', Icons.local_fire_department, isNum: true)),
-              const SizedBox(width: 8),
-              Expanded(child: _dialogField(protCtrl, 'Protein', Icons.fitness_center, isNum: true)),
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setDs) {
+        return AlertDialog(
+          backgroundColor: FQColors.surface,
+          title: Text('ADD FOOD ITEM',
+              style: GoogleFonts.rajdhani(
+                  color: FQColors.cyan,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1)),
+          content: SingleChildScrollView(
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              // Measurement type toggle
+              Row(children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setDs(() => measurementType = 'per_100g'),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      decoration: BoxDecoration(
+                        color: measurementType == 'per_100g'
+                            ? FQColors.cyan.withOpacity(0.15)
+                            : FQColors.card,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                            color: measurementType == 'per_100g'
+                                ? FQColors.cyan
+                                : FQColors.border),
+                      ),
+                      child: Text('Per 100g',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              color: measurementType == 'per_100g'
+                                  ? FQColors.cyan
+                                  : FQColors.muted,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setDs(() => measurementType = 'per_unit'),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      decoration: BoxDecoration(
+                        color: measurementType == 'per_unit'
+                            ? FQColors.gold.withOpacity(0.15)
+                            : FQColors.card,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                            color: measurementType == 'per_unit'
+                                ? FQColors.gold
+                                : FQColors.border),
+                      ),
+                      child: Text('Per Unit',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              color: measurementType == 'per_unit'
+                                  ? FQColors.gold
+                                  : FQColors.muted,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                ),
+              ]),
+              const SizedBox(height: 14),
+              _dialogField(nameCtrl, 'Food Name', Icons.restaurant),
+              if (measurementType == 'per_unit') ...[
+                const SizedBox(height: 10),
+                _dialogField(unitNameCtrl, 'Unit (e.g. egg, slice)', Icons.info_outline),
+              ],
+              const SizedBox(height: 10),
+              Text(
+                measurementType == 'per_unit'
+                    ? 'Nutrition values per 1 unit'
+                    : 'Nutrition values per 100g',
+                style: const TextStyle(color: FQColors.muted, fontSize: 11),
+              ),
+              const SizedBox(height: 8),
+              Row(children: [
+                Expanded(child: _dialogField(calsCtrl, 'Calories', Icons.local_fire_department, isNum: true)),
+                const SizedBox(width: 8),
+                Expanded(child: _dialogField(protCtrl, 'Protein (g)', Icons.fitness_center, isNum: true)),
+              ]),
+              const SizedBox(height: 8),
+              Row(children: [
+                Expanded(child: _dialogField(carbCtrl, 'Carbs (g)', Icons.grass, isNum: true)),
+                const SizedBox(width: 8),
+                Expanded(child: _dialogField(fatsCtrl, 'Fats (g)', Icons.opacity, isNum: true)),
+              ]),
             ]),
-            Row(children: [
-              Expanded(child: _dialogField(carbCtrl, 'Carbs', Icons.grass, isNum: true)),
-              const SizedBox(width: 8),
-              Expanded(child: _dialogField(fatsCtrl, 'Fats', Icons.opacity, isNum: true)),
-            ]),
-          ]),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL', style: TextStyle(color: FQColors.muted))),
-          ElevatedButton(
-            onPressed: () async {
-              if (nameCtrl.text.isEmpty) return;
-              try {
-                await NutritionService.addFoodItem(
-                  widget.userData['username'],
-                  widget.password,
-                  {
-                    'name': nameCtrl.text,
-                    'calories': double.tryParse(calsCtrl.text) ?? 0,
-                    'protein': double.tryParse(protCtrl.text) ?? 0,
-                    'carbs': double.tryParse(carbCtrl.text) ?? 0,
-                    'fats': double.tryParse(fatsCtrl.text) ?? 0,
-                    'measurement_type': 'per_100g',
-                  }
-                );
-                if (ctx.mounted) {
-                  Navigator.pop(ctx);
-                  _loadPantry(); // Refresh list
-                }
-              } catch (e) {
-                debugPrint("Add food error: $e");
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: FQColors.cyan),
-            child: const Text('ADD TO PANTRY'),
           ),
-        ],
-      ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL', style: TextStyle(color: FQColors.muted))),
+            ElevatedButton(
+              onPressed: isAdding ? null : () async {
+                if (nameCtrl.text.isEmpty) return;
+                setDs(() => isAdding = true);
+                try {
+                  await NutritionService.addFoodItem(
+                    widget.userData['username'],
+                    widget.password,
+                    {
+                      'name':             nameCtrl.text,
+                      'calories':         double.tryParse(calsCtrl.text) ?? 0,
+                      'protein':          double.tryParse(protCtrl.text) ?? 0,
+                      'carbs':            double.tryParse(carbCtrl.text) ?? 0,
+                      'fats':             double.tryParse(fatsCtrl.text) ?? 0,
+                      'serving_unit':     measurementType == 'per_unit' ? '1 unit' : '100g',
+                      'measurement_type': measurementType,
+                      'unit_name':        measurementType == 'per_unit'
+                                              ? (unitNameCtrl.text.isEmpty ? 'unit' : unitNameCtrl.text)
+                                              : 'unit',
+                    }
+                  );
+                  if (ctx.mounted) {
+                    Navigator.pop(ctx);
+                    _loadPantry(); // Refresh list
+                  }
+                } catch (e) {
+                  debugPrint("Add food error: $e");
+                } finally {
+                  setDs(() => isAdding = false);
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: FQColors.cyan),
+              child: const Text('ADD TO PANTRY'),
+            ),
+          ],
+        );
+      }),
     );
   }
 

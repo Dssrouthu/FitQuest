@@ -319,17 +319,19 @@ class _RecruitDashboardState extends State<RecruitDashboard> {
                         try {
                           final logs = await AnalyticsService.fetchMySetLogs(
                               _userData['username'], widget.password);
-                          final latestWithVideo = logs.firstWhere(
-                              (l) => l['video_url'] != null && l['pose_data'] != null,
+                          
+                          // Find latest session with pose data (even if video is null)
+                          final latestWithPose = logs.firstWhere(
+                              (l) => l['pose_data'] != null,
                               orElse: () => null);
                           
-                          if (latestWithVideo != null && mounted) {
+                          if (latestWithPose != null && mounted) {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (_) => PosePlaybackScreen(
-                                  videoUrl: latestWithVideo['video_url'],
-                                  poseData: jsonDecode(latestWithVideo['pose_data']),
+                                  videoUrl: latestWithPose['video_url'],
+                                  poseData: jsonDecode(latestWithPose['pose_data']),
                                 ),
                               ),
                             );
