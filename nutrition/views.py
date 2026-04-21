@@ -60,6 +60,15 @@ class CreateDietPlanView(APIView):
                         water_target_liters=data.get('water_target', 3.0)
                     )
                     plan.assigned_to.add(request.user)
+
+                    # Auto-schedule for recruits: every day of the week
+                    days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+                    for day in days:
+                        DietSchedule.objects.update_or_create(
+                            recruit=request.user,
+                            day_of_week=day,
+                            defaults={'diet_plan': plan, 'coach': None}
+                        )
                 else:
                     plan = DietPlan.objects.create(
                         coach=request.user,

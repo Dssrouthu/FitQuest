@@ -94,7 +94,7 @@ class DietSchedule(models.Model):
         ('Monday', 'Monday'), ('Tuesday', 'Tuesday'), ('Wednesday', 'Wednesday'),
         ('Thursday', 'Thursday'), ('Friday', 'Friday'), ('Saturday', 'Saturday'), ('Sunday', 'Sunday')
     ]
-    coach = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='coach_schedules')
+    coach = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='coach_schedules')
     recruit = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='diet_schedule')
     day_of_week = models.CharField(max_length=15, choices=DAYS)
     diet_plan = models.ForeignKey(DietPlan, on_delete=models.SET_NULL, null=True)

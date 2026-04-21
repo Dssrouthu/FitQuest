@@ -143,6 +143,31 @@ class AnalyticsService {
     throw Exception('Failed to log set');
   }
 
+  static Future<Map<String, dynamic>> logWorkoutSet(
+    String u,
+    String p,
+    String exerciseName,
+    String workoutName,
+    int reps, {
+    double weightKg = 0,
+    String? poseData,
+    String? mistakes,
+    String? voiceNote,
+    double xpMultiplier = 1.0,
+  }) async {
+    final body = {
+      'exercise_name': exerciseName,
+      'workout_name': workoutName,
+      'reps': reps,
+      'weight_kg': weightKg,
+      'pose_data': poseData,
+      'mistakes': mistakes,
+      'voice_note': voiceNote,
+      'xp_multiplier': xpMultiplier,
+    };
+    return logSet(u, p, body);
+  }
+
   static Future<List<dynamic>> fetchMySetLogs(String u, String p) async {
     final response = await http
         .get(

@@ -104,6 +104,20 @@ class _RecruitMealPlanBuilderScreenState
                     fontWeight: FontWeight.bold,
                     letterSpacing: 1,
                     fontSize: 15)),
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: ElevatedButton.icon(
+                onPressed: () => _showAddFoodDialog(),
+                icon: const Icon(Icons.add, size: 16),
+                label: const Text('ADD NEW FOOD TO PANTRY'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: FQColors.cyan.withOpacity(0.1),
+                  foregroundColor: FQColors.cyan,
+                  minimumSize: const Size(double.infinity, 40),
+                ),
+              ),
+            ),
             const SizedBox(height: 8),
             Expanded(
               child: _loadingPantry
@@ -160,6 +174,84 @@ class _RecruitMealPlanBuilderScreenState
           ]),
         );
       },
+    );
+  }
+
+  void _showAddFoodDialog() {
+    final nameCtrl = TextEditingController();
+    final calsCtrl = TextEditingController();
+    final protCtrl = TextEditingController();
+    final carbCtrl = TextEditingController();
+    final fatsCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: FQColors.surface,
+        title: Text('ADD NEW FOOD', style: GoogleFonts.rajdhani(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: SingleChildScrollView(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            _dialogField(nameCtrl, 'Food Name', Icons.restaurant),
+            Row(children: [
+              Expanded(child: _dialogField(calsCtrl, 'Calories', Icons.local_fire_department, isNum: true)),
+              const SizedBox(width: 8),
+              Expanded(child: _dialogField(protCtrl, 'Protein', Icons.fitness_center, isNum: true)),
+            ]),
+            Row(children: [
+              Expanded(child: _dialogField(carbCtrl, 'Carbs', Icons.grass, isNum: true)),
+              const SizedBox(width: 8),
+              Expanded(child: _dialogField(fatsCtrl, 'Fats', Icons.opacity, isNum: true)),
+            ]),
+          ]),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL', style: TextStyle(color: FQColors.muted))),
+          ElevatedButton(
+            onPressed: () async {
+              if (nameCtrl.text.isEmpty) return;
+              try {
+                await NutritionService.addFoodItem(
+                  widget.userData['username'],
+                  widget.password,
+                  {
+                    'name': nameCtrl.text,
+                    'calories': double.tryParse(calsCtrl.text) ?? 0,
+                    'protein': double.tryParse(protCtrl.text) ?? 0,
+                    'carbs': double.tryParse(carbCtrl.text) ?? 0,
+                    'fats': double.tryParse(fatsCtrl.text) ?? 0,
+                    'measurement_type': 'per_100g',
+                  }
+                );
+                Navigator.pop(ctx);
+                _loadPantry(); // Refresh list
+              } catch (e) {
+                debugPrint("Add food error: $e");
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: FQColors.cyan),
+            child: const Text('ADD TO PANTRY'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dialogField(TextEditingController ctrl, String hint, IconData icon, {bool isNum = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: TextField(
+        controller: ctrl,
+        keyboardType: isNum ? TextInputType.number : TextInputType.text,
+        style: const TextStyle(color: Colors.white, fontSize: 14),
+        decoration: InputDecoration(
+          prefixIcon: Icon(icon, color: FQColors.cyan, size: 18),
+          hintText: hint,
+          hintStyle: const TextStyle(color: Colors.white24),
+          filled: true,
+          fillColor: Colors.black26,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+        ),
+      ),
     );
   }
 

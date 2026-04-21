@@ -50,6 +50,16 @@ const _exercises = [
       steps: ['Forearms on ground, elbows under shoulders', 'Body straight from head to heels', 'Engage core and glutes', 'Hold position'],
       isPlank: true,
       restTime: 60),
+  _Exercise('lunge', 'Lunge', 'Legs', Icons.directions_walk,
+      difficulty: 'Intermediate',
+      cameraPlacement: 'Place phone at hip height on the side, ~2m away.',
+      steps: ['Step forward with one leg', 'Lower hips until both knees are bent at 90 degrees', 'Push back up to starting position', 'Keep front knee over ankle'],
+      restTime: 60),
+  _Exercise('jumping_jacks', 'Jumping Jacks', 'Full Body', Icons.bolt,
+      difficulty: 'Beginner',
+      cameraPlacement: 'Place phone ~3m away, full body visible.',
+      steps: ['Start with feet together, arms at sides', 'Jump legs out and swing arms overhead', 'Jump back to starting position', 'Maintain a steady rhythm'],
+      restTime: 45),
 ];
 
 class PoseCoachScreen extends StatefulWidget {
@@ -144,6 +154,94 @@ class _PoseCoachScreenState extends State<PoseCoachScreen> with TickerProviderSt
     });
   }
 
+  void _toggleCamera() {
+    setState(() {
+      _cameraDirection = (_cameraDirection == CameraLensDirection.front)
+          ? CameraLensDirection.back
+          : CameraLensDirection.front;
+      _cameraReady = false;
+    });
+    _initCamera();
+  }
+
+  double _getAngle(PoseLandmark first, PoseLandmark mid, PoseLandmark last) {
+    double radians = atan2(last.y - mid.y, last.x - mid.x) -
+                     atan2(first.y - mid.y, first.x - mid.x);
+    double angle = (radians * 180.0 / pi).abs();
+    if (angle > 180.0) angle = 360.0 - angle;
+    return angle;
+  }
+
+  void _startRecording() {
+    setState(() {
+      _isRecording = true;
+      _recordingStartTime = DateTime.now();
+      _recordedPoseData.clear();
+      _repCount = 0;
+      _mistakesInSet.clear();
+      _hint = 'RECORDING... GO!';
+      _voiceNote = '';
+    });
+    _startListening();
+  }
+
+  void _stopRecording() {
+    _stopListening();
+    setState(() {
+      _isRecording = false;
+      _hint = 'SESSION COMPLETE';
+    });
+    _saveSetLog();
+  }
+
+  void _startListening() async {
+    try {
+      bool available = await _speech.initialize();
+      if (available) {
+        _speech.listen(onResult: (val) {
+          if (mounted) setState(() => _voiceNote = val.recognizedWords);
+        });
+      }
+    } catch (e) {
+      debugPrint("STT error: $e");
+    }
+  }
+
+  void _stopListening() {
+    _speech.stop();
+  }
+
+  Future<void> _saveSetLog() async {
+    if (widget.userData == null) return;
+    try {
+      await AnalyticsService.logWorkoutSet(
+        widget.userData!['username'],
+        widget.password!,
+        _selectedExercise!.name,
+        'Pose Coach Session',
+        _repCount,
+        weightKg: 0,
+        poseData: jsonEncode(_recordedPoseData),
+        mistakes: _mistakesInSet.join(', '),
+        voiceNote: _voiceNote,
+        xpMultiplier: _calculateXPMultiplier(),
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Battle Logged! XP Awarded.')),
+        );
+      }
+    } catch (e) {
+      debugPrint("Save log error: $e");
+    }
+  }
+
+  double _calculateXPMultiplier() {
+    // Battle Rhythm implementation: closer to 2-1-2 tempo = higher multiplier
+    // For now, base 1.2 if any reps done, 1.0 otherwise.
+    return _repCount > 0 ? 1.2 : 1.0;
+  }
+
   Future<void> _processImage(CameraImage image) async {
     if (_poseDetector == null) return;
     
@@ -164,6 +262,89 @@ class _PoseCoachScreenState extends State<PoseCoachScreen> with TickerProviderSt
         _poses = poses;
         _isDetecting = false;
       });
+
+      if (_isRecording && poses.isNotEmpty) {
+        final pose = poses.first;
+        final ex = _selectedExercise!.id;
+        final landmarks = pose.landmarks;
+
+        // Record pose data for ghost duel
+        Map<String, dynamic> frame = {};
+        landmarks.forEach((type, landmark) {
+          frame[type.name] = [landmark.x, landmark.y];
+        });
+        _recordedPoseData.add({
+          't': DateTime.now().difference(_recordingStartTime!).inMilliseconds,
+          'p': frame
+        });
+
+        // ── Rep Counting Logic ──
+        try {
+          if (ex == 'squat') {
+            final leftKnee = _getAngle(landmarks[PoseLandmarkType.leftHip]!, landmarks[PoseLandmarkType.leftKnee]!, landmarks[PoseLandmarkType.leftAnkle]!);
+            final rightKnee = _getAngle(landmarks[PoseLandmarkType.rightHip]!, landmarks[PoseLandmarkType.rightKnee]!, landmarks[PoseLandmarkType.rightAnkle]!);
+            double avgKnee = (leftKnee + rightKnee) / 2;
+
+            if (avgKnee < 90) { // Down phase
+              if (!_inDownPhase) {
+                _inDownPhase = true;
+                _phase = 'down';
+                _hint = 'HOLD...';
+              }
+            } else if (avgKnee > 160) { // Up phase
+              if (_inDownPhase) {
+                _repCount++;
+                _inDownPhase = false;
+                _phase = 'up';
+                _hint = 'REP $_repCount!';
+                _sfxPlayer.play(AssetSource('audio/loot_drop.mp3'));
+              }
+            }
+          } 
+          else if (ex == 'pushup') {
+            final leftElbow = _getAngle(landmarks[PoseLandmarkType.leftShoulder]!, landmarks[PoseLandmarkType.leftElbow]!, landmarks[PoseLandmarkType.leftWrist]!);
+            final rightElbow = _getAngle(landmarks[PoseLandmarkType.rightShoulder]!, landmarks[PoseLandmarkType.rightElbow]!, landmarks[PoseLandmarkType.rightWrist]!);
+            double avgElbow = (leftElbow + rightElbow) / 2;
+
+            if (avgElbow < 80) {
+              if (!_inDownPhase) { _inDownPhase = true; _phase = 'down'; _hint = 'PUSH!'; }
+            } else if (avgElbow > 150) {
+              if (_inDownPhase) {
+                _repCount++; _inDownPhase = false; _phase = 'up'; _hint = 'REP $_repCount!';
+                _sfxPlayer.play(AssetSource('audio/loot_drop.mp3'));
+              }
+            }
+          }
+          else if (ex == 'lunge') {
+            final leftKnee = _getAngle(landmarks[PoseLandmarkType.leftHip]!, landmarks[PoseLandmarkType.leftKnee]!, landmarks[PoseLandmarkType.leftAnkle]!);
+            final rightKnee = _getAngle(landmarks[PoseLandmarkType.rightHip]!, landmarks[PoseLandmarkType.rightKnee]!, landmarks[PoseLandmarkType.rightAnkle]!);
+            
+            if (leftKnee < 100 || rightKnee < 100) {
+              if (!_inDownPhase) { _inDownPhase = true; _phase = 'down'; }
+            } else if (leftKnee > 150 && rightKnee > 150) {
+              if (_inDownPhase) {
+                _repCount++; _inDownPhase = false; _phase = 'up'; _hint = 'REP $_repCount!';
+                _sfxPlayer.play(AssetSource('audio/loot_drop.mp3'));
+              }
+            }
+          }
+          else if (ex == 'jumping_jacks') {
+            final leftShoulder = _getAngle(landmarks[PoseLandmarkType.leftHip]!, landmarks[PoseLandmarkType.leftShoulder]!, landmarks[PoseLandmarkType.leftElbow]!);
+            final rightShoulder = _getAngle(landmarks[PoseLandmarkType.rightHip]!, landmarks[PoseLandmarkType.rightShoulder]!, landmarks[PoseLandmarkType.rightElbow]!);
+            
+            if (leftShoulder > 140 && rightShoulder > 140) {
+              if (!_inDownPhase) { _inDownPhase = true; _phase = 'up'; }
+            } else if (leftShoulder < 40 && rightShoulder < 40) {
+              if (_inDownPhase) {
+                _repCount++; _inDownPhase = false; _phase = 'down'; _hint = 'REP $_repCount!';
+                _sfxPlayer.play(AssetSource('audio/loot_drop.mp3'));
+              }
+            }
+          }
+        } catch (e) {
+          // Landmarks missing in frame
+        }
+      }
     }
   }
 
@@ -259,6 +440,10 @@ class _PoseCoachScreenState extends State<PoseCoachScreen> with TickerProviderSt
         title: Text(_isGhostDuel ? 'DUEL: VS ${_ghostUsername?.toUpperCase()}' : 'POSE COACH', style: GoogleFonts.rajdhani(fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
+            icon: Icon(Icons.switch_camera, color: Colors.white),
+            onPressed: _toggleCamera,
+          ),
+          IconButton(
             icon: Icon(Icons.music_note, color: _isAmbientPlaying ? FQColors.purple : Colors.white), 
             onPressed: () => _isAmbientPlaying ? _stopAmbient() : _playAmbient(false)
           ),
@@ -283,13 +468,55 @@ class _PoseCoachScreenState extends State<PoseCoachScreen> with TickerProviderSt
                 currentTimestampMs: _isRecording ? DateTime.now().difference(_recordingStartTime!).inMilliseconds : 0,
               ),
             ),
+
+          // Battle Rhythm Visualizer (Pulse)
+          if (_isRecording)
+            Positioned(
+              top: 100, right: 20,
+              child: _BattleRhythmIndicator(phase: _phase),
+            ),
           
           Positioned(
             bottom: 40, left: 0, right: 0,
-            child: Center(
-              child: Text(_hint, style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold, backgroundColor: Colors.black54)),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(_hint, style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold, backgroundColor: Colors.black54)),
+                const SizedBox(height: 20),
+                if (_cameraReady)
+                  GestureDetector(
+                    onTap: _isRecording ? _stopRecording : _startRecording,
+                    child: Container(
+                      width: 80, height: 80,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 4),
+                        color: _isRecording ? Colors.red.withOpacity(0.5) : Colors.transparent,
+                      ),
+                      child: Center(
+                        child: Container(
+                          width: _isRecording ? 30 : 60, height: _isRecording ? 30 : 60,
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            borderRadius: BorderRadius.circular(_isRecording ? 5 : 30),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
+
+          if (_voiceNote.isNotEmpty)
+            Positioned(
+              top: 60, left: 20, right: 20,
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                color: Colors.black54,
+                child: Text('Voice Rune: "$_voiceNote"', style: const TextStyle(color: FQColors.gold, fontSize: 12, fontStyle: FontStyle.italic)),
+              ),
+            ),
         ],
       ),
     );
@@ -438,4 +665,41 @@ class _PosePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _PosePainter oldDelegate) => true;
+}
+
+class _BattleRhythmIndicator extends StatefulWidget {
+  final String phase;
+  const _BattleRhythmIndicator({required this.phase});
+  @override
+  State<_BattleRhythmIndicator> createState() => _BattleRhythmIndicatorState();
+}
+
+class _BattleRhythmIndicatorState extends State<_BattleRhythmIndicator> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() { _controller.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    Color color = widget.phase == 'down' ? FQColors.cyan : FQColors.purple;
+    return ScaleTransition(
+      scale: Tween(begin: 1.0, end: 1.2).animate(_controller),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: color, width: 3),
+          boxShadow: [BoxShadow(color: color.withOpacity(0.5), blurRadius: 10)],
+        ),
+        child: Text(widget.phase.toUpperCase(), style: GoogleFonts.rajdhani(color: color, fontWeight: FontWeight.bold, fontSize: 12)),
+      ),
+    );
+  }
 }
