@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
 import 'dart:math';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:camera/camera.dart';
@@ -91,26 +90,16 @@ class _PoseCoachScreenState extends State<PoseCoachScreen> with TickerProviderSt
   int _repCount = 0;
   bool _inDownPhase = false;
   String _phase = '';
-  Set<String> _mistakesInSet = {}; 
+  final Set<String> _mistakesInSet = {}; 
 
   // Audio (Bard's Tavern & Loot Drops)
   final AudioPlayer _ambientPlayer = AudioPlayer();
   final AudioPlayer _sfxPlayer = AudioPlayer();
   bool _isAmbientPlaying = false;
 
-  // Battle Rhythm (Rest Timer)
-  bool _isResting = false;
-  int _restSecondsRemaining = 0;
-  Timer? _restTimer;
-
   // Voice Runes (Speech to Text)
   final stt.SpeechToText _speech = stt.SpeechToText();
-  bool _isListening = false;
   String _voiceNote = '';
-
-  // Plank hold timer
-  int _plankSeconds = 0;
-  Timer? _plankTimer;
 
   // Ghost Duel State
   List<dynamic> _ghostPoseData = [];
@@ -129,8 +118,6 @@ class _PoseCoachScreenState extends State<PoseCoachScreen> with TickerProviderSt
     _poseDetector?.close();
     _ambientPlayer.dispose();
     _sfxPlayer.dispose();
-    _restTimer?.cancel();
-    _plankTimer?.cancel();
     super.dispose();
   }
 
@@ -372,12 +359,10 @@ class _PoseCoachScreenState extends State<PoseCoachScreen> with TickerProviderSt
     setState(() {
       _selectedExercise = ex;
       _repCount = 0;
-      _plankSeconds = 0;
       _inDownPhase = false;
       _phase = '';
       _recordedPoseData.clear();
       _mistakesInSet.clear();
-      _isResting = false;
       _isGhostDuel = duelId != null;
     });
 

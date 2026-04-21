@@ -222,8 +222,10 @@ class _RecruitMealPlanBuilderScreenState
                     'measurement_type': 'per_100g',
                   }
                 );
-                Navigator.pop(ctx);
-                _loadPantry(); // Refresh list
+                if (ctx.mounted) {
+                  Navigator.pop(ctx);
+                  _loadPantry(); // Refresh list
+                }
               } catch (e) {
                 debugPrint("Add food error: $e");
               }
