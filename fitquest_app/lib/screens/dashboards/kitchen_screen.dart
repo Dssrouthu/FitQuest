@@ -724,9 +724,16 @@ class _EditMealSheetState extends State<EditMealSheet> {
                               icon: const Icon(Icons.remove_circle_outline,
                                   color: FQColors.muted, size: 20),
                               onPressed: () => setState(() {
-                                if (item['display_grams'] > 50) {
-                                  item['display_grams'] -= 50;
-                                  item['quantity'] = item['display_grams'] / 100;
+                                if (item['display_grams'] > 0) {
+                                  if (item['display_grams'] >= 50) {
+                                    item['display_grams'] -= 50;
+                                    item['quantity'] = item['display_grams'] / 100;
+                                    item['display_str'] = '${item['display_grams'].toStringAsFixed(0)}g';
+                                  }
+                                } else if (item['quantity'] > 1) {
+                                  // Per unit item
+                                  item['quantity'] -= 1;
+                                  item['display_str'] = '${item['quantity'].toStringAsFixed(0)} unit(s)';
                                 }
                               }),
                             ),
@@ -734,8 +741,15 @@ class _EditMealSheetState extends State<EditMealSheet> {
                               icon: const Icon(Icons.add_circle_outline,
                                   color: FQColors.muted, size: 20),
                               onPressed: () => setState(() {
-                                item['display_grams'] += 50;
-                                item['quantity'] = item['display_grams'] / 100;
+                                if (item['display_grams'] > 0 || (item['display_str'] ?? '').contains('g')) {
+                                  item['display_grams'] += 50;
+                                  item['quantity'] = item['display_grams'] / 100;
+                                  item['display_str'] = '${item['display_grams'].toStringAsFixed(0)}g';
+                                } else {
+                                  // Per unit item
+                                  item['quantity'] += 1;
+                                  item['display_str'] = '${item['quantity'].toStringAsFixed(0)} unit(s)';
+                                }
                               }),
                             ),
                             IconButton(

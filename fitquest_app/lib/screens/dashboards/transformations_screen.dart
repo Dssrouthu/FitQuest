@@ -395,7 +395,8 @@ class _TransformationsScreenState extends State<TransformationsScreen> {
           const SizedBox(height: 12),
           ElevatedButton(
             onPressed: _load,
-            style: ElevatedButton.styleFrom(backgroundColor: FQColors.cyan),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: FQColors.cyan, foregroundColor: Colors.black),
             child: const Text('RETRY'),
           ),
         ]),

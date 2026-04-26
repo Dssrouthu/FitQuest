@@ -316,7 +316,10 @@ class _RecruitMealPlanBuilderScreenState
                   setDs(() => isAdding = false);
                 }
               },
-              style: ElevatedButton.styleFrom(backgroundColor: FQColors.cyan),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: FQColors.cyan,
+                foregroundColor: Colors.black,
+              ),
               child: const Text('ADD TO PANTRY'),
             ),
           ],
@@ -345,7 +348,10 @@ class _RecruitMealPlanBuilderScreenState
   }
 
   void _showQuantityDialog(int mealIndex, Map<String, dynamic> food) {
-    final ctrl = TextEditingController(text: '1');
+    final ctrl = TextEditingController(text: '100');
+    final isPerUnit = food['measurement_type'] == 'per_unit';
+    if (isPerUnit) ctrl.text = '1';
+
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -365,7 +371,9 @@ class _RecruitMealPlanBuilderScreenState
                 const TextInputType.numberWithOptions(decimal: true),
             style: const TextStyle(color: Colors.white),
             decoration: InputDecoration(
-              labelText: 'Quantity (${food["serving_unit"]})',
+              labelText: isPerUnit 
+                  ? 'Quantity (${food["unit_name"] ?? "units"})'
+                  : 'Quantity (grams)',
               labelStyle: const TextStyle(color: FQColors.muted),
             ),
             autofocus: true,
@@ -382,7 +390,8 @@ class _RecruitMealPlanBuilderScreenState
                 backgroundColor: FQColors.green,
                 foregroundColor: Colors.black),
             onPressed: () {
-              final qty = double.tryParse(ctrl.text) ?? 1.0;
+              final val = double.tryParse(ctrl.text) ?? 1.0;
+              final qty = isPerUnit ? val : val / 100.0;
               setState(() {
                 _meals[mealIndex]['items'].add({
                   'food_id': food['id'],
@@ -390,6 +399,9 @@ class _RecruitMealPlanBuilderScreenState
                   'quantity': qty,
                   'calories': (food['calories'] as num? ?? 0) * qty,
                   'serving_unit': food['serving_unit'],
+                  'display_str': isPerUnit 
+                      ? '${val.toStringAsFixed(0)} ${food["unit_name"] ?? "unit"}'
+                      : '${val.toStringAsFixed(0)}g',
                 });
               });
               Navigator.pop(context);
@@ -692,7 +704,7 @@ class _RecruitMealPlanBuilderScreenState
                       style: const TextStyle(
                           color: Colors.white, fontSize: 12)),
                   Text(
-                    '${item["quantity"]} × ${item["serving_unit"]}  ·  '
+                    '${item["display_str"] ?? (item["quantity"].toString() + " × " + item["serving_unit"])}  ·  '
                     '${((item["calories"] as num?) ?? 0).toStringAsFixed(0)} kcal',
                     style: const TextStyle(
                         color: FQColors.muted, fontSize: 11),
